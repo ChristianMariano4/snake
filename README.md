@@ -1,2 +1,2 @@
-# snake
-Implementation of the famous game Snake in C
+# Snake
+Implementation in C of the famous game Snake
