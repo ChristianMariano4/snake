@@ -7,6 +7,7 @@
 */
 
 #include <stdio.h>
+#include <sys/time.h>
 #include <time.h>
 #include <SDL2/SDL.h>
 
@@ -59,6 +60,7 @@ void init_food(Game *game);
 
 void render_game(SDL_Renderer *renderer, Game *game);
 void render_food(SDL_Renderer *renderer, Game *game);
+void remove_food(SDL_Renderer *renderer, Game *game);
 void render_board(SDL_Renderer *renderer);
 
 // ------------------
@@ -155,6 +157,43 @@ void init_food(Game *game)
   return;
 }
 
+int allow_refresh_food(void)
+{
+  static struct timeval old_t = {0}; // static is needed to have persistent memory across different calls
+  static struct timeval new_t = {0};
+  static int init = -1;
+  Uint32 time_elapsed = -1;
+
+  if (init == -1)
+  {
+    init = 1;
+    gettimeofday(&old_t, NULL);
+    return 1;
+  }
+
+  gettimeofday(&new_t, NULL);
+  time_elapsed = (double)(new_t.tv_usec - old_t.tv_usec) / 1000000 + (double)(new_t.tv_sec - old_t.tv_sec); // secs between two calls
+
+  if (time_elapsed < DELAY_FOOD_SPAWN)
+  {
+    return 0;
+  }
+  else
+  {
+    old_t = new_t; // update with current timestamp
+    return 1;
+  }
+}
+
+void update_food(SDL_Renderer *renderer, Game *game)
+{
+  if (allow_refresh_food())
+  {
+    remove_food(renderer, game);
+    init_food(game);
+  }
+}
+
 // ------------------
 // RENDER FUNCTIONS
 
@@ -202,6 +241,26 @@ void render_food(SDL_Renderer *renderer, Game *game)
   }
 }
 
+void remove_food(SDL_Renderer *renderer, Game *game)
+{
+  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+  for (int i = 0; i < FOODS_COUNT; i++)
+  {
+    Food f = game->food[i];
+
+    if (!f.score)
+      continue;
+
+    SDL_Rect rect = {
+        (int)floorf(f.pos.x * CELL_WIDTH),
+        (int)floorf(f.pos.y * CELL_HEIGHT),
+        (int)floorf(CELL_WIDTH),
+        (int)floorf(CELL_HEIGHT)};
+
+    scc(SDL_RenderFillRect(renderer, &rect));
+  }
+}
+
 int main(void)
 {
   srand(time(0));
@@ -228,6 +287,9 @@ int main(void)
     // update game/renderer
     scc(SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0));
     SDL_RenderClear(renderer);
+
+    update_food(renderer, &GAME);
+
     render_game(renderer, &GAME);
 
     SDL_RenderPresent(renderer);
