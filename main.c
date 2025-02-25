@@ -64,6 +64,7 @@ typedef struct
   Snake snake;
   Food food[FOODS_COUNT];
   double game_speed;
+  int global_score;
   int quit;
 } Game;
 
@@ -79,7 +80,19 @@ int pos_is_not_empty(Game *game, Pos p);
 Pos random_empty_board_pos(Game *game);
 
 void init_game(Game *game);
+
+Pos *get_snake_head(Snake *snake);
+int allow_snake_movement(int manual, Game *game);
+Pos peak_next_pos(Snake *snake, Dir dir);
+void move_snake(Dir new_dir, Game *game, int manual);
+void eat_food(Game *game, Food *f);
+
 void init_food(Game *game);
+int allow_refresh_food(void);
+Food *check_for_food(Game *game);
+void update_food(SDL_Renderer *renderer, Game *game);
+
+void update_game_speed(Game *game);
 
 void render_game(SDL_Renderer *renderer, Game *game);
 void render_food(SDL_Renderer *renderer, Game *game);
@@ -175,9 +188,13 @@ void init_game(Game *game)
   game->snake.length = 1;
   game->snake.dir = random_dir();
 
-  game->quit = 0;
-
   init_food(game);
+
+  // TODO: init obstacles
+
+  game->quit = 0;
+  game->global_score = 0;
+  game->game_speed = MAX_SNAKE_MOVEMENT;
 }
 
 Pos *get_snake_head(Snake *snake)
@@ -185,7 +202,7 @@ Pos *get_snake_head(Snake *snake)
   return &snake->body[snake->length - 1];
 }
 
-int allow_snake_movement(int manual) // if manual == 1 then it returns always 1
+int allow_snake_movement(int manual, Game *game) // if manual == 1 then it returns always 1
 {
   static struct timeval old_t = {0}; // static is needed to have persistent memory across different calls
   static struct timeval new_t = {0};
@@ -202,7 +219,7 @@ int allow_snake_movement(int manual) // if manual == 1 then it returns always 1
   gettimeofday(&new_t, NULL);
   time_elapsed = (double)(new_t.tv_usec - old_t.tv_usec) / 1000000 + (double)(new_t.tv_sec - old_t.tv_sec); // secs between two calls
 
-  if (!manual && time_elapsed < DELAY_FOOD_SPAWN)
+  if (!manual && time_elapsed < game->game_speed)
   {
     return 0;
   }
@@ -250,7 +267,7 @@ Pos peak_next_pos(Snake *snake, Dir dir)
 
 void move_snake(Dir new_dir, Game *game, int manual)
 {
-  if (!allow_snake_movement(manual))
+  if (!allow_snake_movement(manual, game))
   {
     return;
   }
@@ -258,7 +275,7 @@ void move_snake(Dir new_dir, Game *game, int manual)
   Snake *snake = &game->snake;
   Pos new_pos = peak_next_pos(snake, new_dir);
 
-  // cant move back to snake'2 own tail
+  // cant move back to snake's own tail
   if (snake->length >= 2 &&
       new_pos.x == snake->body[snake->length - 2].x &&
       new_pos.y == snake->body[snake->length - 2].y)
@@ -278,6 +295,22 @@ void move_snake(Dir new_dir, Game *game, int manual)
     snake->body[i] = old_pos;
     old_pos = tmp_pos;
   }
+}
+
+void eat_food(Game *game, Food *f)
+{
+  Snake *snake = &game->snake;
+
+  // eat food
+  game->global_score += f->score;
+  f->score = 0; // food not more eatable
+
+  // grow snake's body
+  Pos new_pos = peak_next_pos(snake, snake->dir);
+  snake->length++;
+  snake->body[snake->length - 1] = new_pos;
+
+  return;
 }
 
 void init_food(Game *game)
@@ -319,6 +352,24 @@ int allow_refresh_food(void)
   }
 }
 
+Food *check_for_food(Game *game)
+{
+  Snake *snake = &game->snake;
+  Pos head_pos = *get_snake_head(snake);
+
+  for (int i = 0; i < FOODS_COUNT; i++)
+  {
+    Food *f = &game->food[i];
+
+    if (f->pos.x == head_pos.x &&
+        f->pos.y == head_pos.y &&
+        f->score > 0)
+      return f;
+  }
+
+  return NULL;
+}
+
 void update_food(SDL_Renderer *renderer, Game *game)
 {
   if (allow_refresh_food())
@@ -326,6 +377,24 @@ void update_food(SDL_Renderer *renderer, Game *game)
     remove_food(renderer, game);
     init_food(game);
   }
+
+  return;
+}
+
+void update_game_speed(Game *game)
+{
+  double step_update = game->global_score * STEP_SNAKE_MOVEMENT;
+
+  if (MAX_SNAKE_MOVEMENT - step_update < MIN_SNAKE_MOVEMENT)
+  {
+    game->game_speed = MIN_SNAKE_MOVEMENT;
+  }
+  else
+  {
+    game->game_speed = MAX_SNAKE_MOVEMENT - step_update;
+  }
+
+  return;
 }
 
 // ------------------
@@ -467,6 +536,12 @@ int main(void)
 
     // main logic loop
     move_snake(GAME.snake.dir, &GAME, 0);
+    Food *f = check_for_food(&GAME);
+    if (f)
+    {
+      eat_food(&GAME, f);
+      update_game_speed(&GAME);
+    }
     update_food(renderer, &GAME);
 
     // rendering stuff
