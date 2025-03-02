@@ -47,6 +47,18 @@
     (game)->obs[off++] = (Obstacle){(Pos) {x - 2, y}, 1}; \
     // clang-format on
 
+#define BACKGROUND_COLOR 0x000000FF
+#define SNAKE_COLOR 0xEE72F100
+#define FOOD_COLOR 0X77B28C00
+#define OBSTACLE_COLOR 0X964B0000
+#define SCORE_COLOR 0XFFFFFF00
+
+#define HEX_COLOR(hex)                     \
+    ((hex) >> (3 * 8)) & 0xFF,             \
+    ((hex) >> (2 * 8)) & 0xFF,             \
+    ((hex) >> (1 * 8)) & 0xFF,             \
+    ((hex) >> (0 * 8)) & 0xFF             
+
 // ------------------
 // DATA STRUCTURES
 
@@ -414,7 +426,7 @@ int check_for_obstacle(Game *game) {
 // RENDER FUNCTIONS
 
 void render_game(SDL_Renderer *renderer, Game *game) {
-    scc(SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0));
+    scc(SDL_SetRenderDrawColor(renderer, HEX_COLOR(BACKGROUND_COLOR)));
     SDL_RenderClear(renderer);
     render_board(renderer);
     render_snake(renderer, game);
@@ -424,7 +436,7 @@ void render_game(SDL_Renderer *renderer, Game *game) {
 }
 
 void render_board(SDL_Renderer *renderer) {
-    scc(SDL_SetRenderDrawColor(renderer, 255, 255, 255, 0));
+    scc(SDL_SetRenderDrawColor(renderer, HEX_COLOR(BACKGROUND_COLOR)));
     for (int x = 0; x < BOARD_WIDTH; x++) {
         SDL_RenderDrawLine(renderer, x * CELL_WIDTH, 0, x * CELL_WIDTH,
                            SCREEN_HEIGHT);
@@ -437,7 +449,7 @@ void render_board(SDL_Renderer *renderer) {
 }
 
 void render_food(SDL_Renderer *renderer, Game *game) {
-    scc(SDL_SetRenderDrawColor(renderer, 119, 178, 140, 0));
+    scc(SDL_SetRenderDrawColor(renderer, HEX_COLOR(FOOD_COLOR)));
 
     for (int i = 0; i < FOODS_COUNT; i++) {
         Food f = game->food[i];
@@ -455,7 +467,7 @@ void render_food(SDL_Renderer *renderer, Game *game) {
 }
 
 void render_obstacles(SDL_Renderer *renderer, Game *game) {
-    scc(SDL_SetRenderDrawColor(renderer, 150, 75, 0, 0));
+    scc(SDL_SetRenderDrawColor(renderer, HEX_COLOR(OBSTACLE_COLOR)));
 
     for (int i = 0; i < OBSTACLES_COUNT; i++) {
         Obstacle ob = game->obs[i];
@@ -471,7 +483,7 @@ void render_obstacles(SDL_Renderer *renderer, Game *game) {
 }
 
 void render_snake(SDL_Renderer *renderer, Game *game) {
-    scc(SDL_SetRenderDrawColor(renderer, 255, 255, 255, 0));
+    scc(SDL_SetRenderDrawColor(renderer, HEX_COLOR(SNAKE_COLOR)));
     Snake *snake = &game->snake;
 
     for (int i = snake->length - 1; i >= 0; i--) {
@@ -485,7 +497,7 @@ void render_snake(SDL_Renderer *renderer, Game *game) {
 }
 
 void remove_food(SDL_Renderer *renderer, Game *game) {
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+    SDL_SetRenderDrawColor(renderer, HEX_COLOR(BACKGROUND_COLOR));
     for (int i = 0; i < FOODS_COUNT; i++) {
         Food f = game->food[i];
 
