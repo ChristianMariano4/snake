@@ -6,10 +6,11 @@
   - SDL2_font
 */
 
-#include <SDL2/SDL.h>
 #include <stdio.h>
-#include <sys/time.h>
 #include <time.h>
+#include <sys/time.h>
+#include <SDL2/SDL.h>
+#include <SDL_ttf.h>
 
 #define SCREEN_WIDTH 900
 #define SCREEN_HEIGHT 900
@@ -125,12 +126,13 @@ void update_game_speed(Game *game);
 
 int check_for_obstacle(Game *game);
 
-void render_game(SDL_Renderer *renderer, Game *game);
+void render_game(SDL_Renderer *renderer, Game *game, TTF_Font *font);
 void render_food(SDL_Renderer *renderer, Game *game);
 void render_obstacles(SDL_Renderer *renderer, Game *game);
 void render_snake(SDL_Renderer *renderer, Game *game);
 void remove_food(SDL_Renderer *renderer, Game *game);
 void render_board(SDL_Renderer *renderer);
+void render_game_score(SDL_Renderer *renderer, Game *game, TTF_Font *font);
 
 // ------------------
 // GLOBAL VARIABLES
@@ -217,9 +219,8 @@ void init_game(Game *game) {
 
     // init obstacles
     int offset = 0;
-    STAR_OBSTACLES(game, offset, 3, 3);
+    STAR_OBSTACLES(game, offset, 10, 10);
     HORIZONTAL_WALL_OBSTACLE(game, offset, 20, 20);
-    STAR_OBSTACLES(game, offset, 7, 7);
 
     game->quit = 0;
     game->global_score = 0;
@@ -425,13 +426,14 @@ int check_for_obstacle(Game *game) {
 // ------------------
 // RENDER FUNCTIONS
 
-void render_game(SDL_Renderer *renderer, Game *game) {
+void render_game(SDL_Renderer *renderer, Game *game, TTF_Font * font) {
     scc(SDL_SetRenderDrawColor(renderer, HEX_COLOR(BACKGROUND_COLOR)));
     SDL_RenderClear(renderer);
     render_board(renderer);
     render_snake(renderer, game);
     render_food(renderer, game);
     render_obstacles(renderer, game);
+    render_game_score(renderer, game, font);
     SDL_RenderPresent(renderer);
 }
 
@@ -496,8 +498,47 @@ void render_snake(SDL_Renderer *renderer, Game *game) {
     }
 }
 
+void render_game_score(SDL_Renderer *renderer, Game *game, TTF_Font *font) {
+    static SDL_Surface *surface;
+    static SDL_Texture *texture;
+    static int init = -1;
+    static int prev_score = -1;
+
+    if (prev_score == game->global_score) {
+        // nothing to update
+        return; 
+    }
+
+    if (init != -1) {
+        // clean previous allocations
+        SDL_DestroyTexture(texture);
+        SDL_FreeSurface(surface);
+    }
+
+    // create new string
+    char str[32];
+    sprintf(str, "Score: %d", game->global_score);
+
+    // allocate it and display it
+    surface = TTF_RenderText_Solid(font, str, (SDL_Color){HEX_COLOR(SCORE_COLOR)});
+
+    if (!surface) {
+        printf("Error %s\n", TTF_GetError());
+        exit(1);
+    }
+
+    texture = scp(SDL_CreateTextureFromSurface(renderer, surface));
+
+    int textW = 0, textH = 0;
+    SDL_QueryTexture(texture, NULL, NULL, &textW, &textH);
+    SDL_Rect text_rect = {0, 0, textW, textH};
+
+    SDL_RenderCopy(renderer, texture, NULL, &text_rect);
+    init = 1;
+}
+
 void remove_food(SDL_Renderer *renderer, Game *game) {
-    SDL_SetRenderDrawColor(renderer, HEX_COLOR(BACKGROUND_COLOR));
+    scc(SDL_SetRenderDrawColor(renderer, HEX_COLOR(BACKGROUND_COLOR)));
     for (int i = 0; i < FOODS_COUNT; i++) {
         Food f = game->food[i];
 
@@ -513,13 +554,22 @@ void remove_food(SDL_Renderer *renderer, Game *game) {
 
 int main(void) {
     srand(time(0));
-    SDL_Init(SDL_INIT_VIDEO);
 
+    // init classic SDL
+    SDL_Init(SDL_INIT_VIDEO);
     SDL_Window *const window =
         scp(SDL_CreateWindow("Description...", 0, 0, SCREEN_WIDTH,
                              SCREEN_HEIGHT, SDL_WINDOW_RESIZABLE));
     SDL_Renderer *const renderer =
         scp(SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED));
+
+    // init font
+    TTF_Init();
+    char* const font_path = "./fonts/LiberationMono-Regular.ttf";
+    TTF_Font *font = TTF_OpenFont(font_path, 30);
+    if (!font) {
+        printf("Error loading font '%s': %s\n", font_path, TTF_GetError());
+    }
 
     init_game(&GAME);
 
@@ -566,8 +616,11 @@ int main(void) {
         update_food(renderer, &GAME);
 
         // rendering stuff
-        render_game(renderer, &GAME);
+        render_game(renderer, &GAME, font);
     }
+
+    TTF_Quit();
+    SDL_Quit();
 
     return 0;
 }
