@@ -619,6 +619,7 @@ int main(void) {
         render_game(renderer, &GAME, font);
     }
 
+    TTF_CloseFont(font);
     TTF_Quit();
     SDL_Quit();
 
